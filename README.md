@@ -1,35 +1,51 @@
-# AI Agent
+# MicroAI Chat
 
-A conversational AI agent built with [LangChain](https://www.langchain.com/) and [Ollama](https://ollama.com/), running locally with tool-augmented ReAct reasoning.
+> Your private AI assistant. Runs locally. Knows the world.
 
-## Features
+MicroAI Chat is a lightweight conversational AI agent powered by [Ollama](https://ollama.com/) and [LangChain](https://www.langchain.com/). It thinks, searches, calculates, and answers — all on your machine, with no data leaving your device.
 
-- ReAct (Reasoning + Acting) agent loop
-- Local LLM via Ollama — no cloud required
-- Built-in tools: weather lookup, calculator
-- Multilingual — responds in the user's language
+---
+
+## Why MicroAI Chat?
+
+**Privacy first.** No API keys. No cloud. Your conversations stay on your hardware.
+
+**Actually useful.** Ask about the weather, do math, look up facts, read Wikipedia, catch the latest news — all in one chat window.
+
+**Speaks your language.** Ukrainian, English, or whatever you type — MicroAI responds in kind.
+
+---
+
+## What it can do
+
+| Skill | Example |
+|-------|---------|
+| Live weather | *"Яка погода у Львові?"* |
+| Math | *"What is 15% of 4800?"* |
+| Wikipedia lookup | *"Tell me about Nikola Tesla"* |
+| Latest news | *"Give me today's top news"* |
+| File analysis | *"Summarize tools/weather.py"* |
+| General knowledge | *"Who founded Apple?"* |
+
+---
 
 ## Requirements
 
 - Python 3.10+
-- [Ollama](https://ollama.com/) running locally (default: `http://host.docker.internal:11434`)
-- Model pulled in Ollama (e.g. `llama3.1:8b` or `qwen2.5:7b`)
+- [Ollama](https://ollama.com/) running on your machine
+- Recommended model: `qwen2.5:14b`
 
-## Installation
+> **Performance tip:** Run Ollama on the **host machine** (not inside Docker) so it can access your GPU directly via Metal (macOS) or CUDA (Linux/Windows). Models running inside a container lose GPU acceleration and fall back to CPU — significantly slower.
+>
+> `qwen2.5:14b` on an M2 Max with Metal runs ~40 tok/s. The same model on CPU: ~4 tok/s.
+
+---
+
+## Quick Start
 
 ```bash
 pip install -r requirements-ai.txt
-```
-
-Pull a model:
-
-```bash
-ollama pull llama3.1:8b
-```
-
-## Usage
-
-```bash
+ollama pull qwen2.5:14b
 python chat.py
 ```
 
@@ -37,45 +53,53 @@ python chat.py
 AI Agent
 Type /exit to quit
 
-You: What is the weather in Kyiv?
-AI: Kyiv: ☀️ +18°C
+You: What's the weather in Kyiv?
+AI: Kyiv is currently sunny, +18°C — a great day to be outside.
+
+You: Latest news?
+AI: • Ukraine and EU sign new cooperation agreement (Tue, 13 May 2026)
+    • ...
 
 You: /exit
 Bye!
 ```
 
+---
+
 ## Project Structure
 
 ```
 AIAgent/
-├── chat.py             # Entry point — interactive chat loop
-├── main.py             # Alternative entry point
-├── ollama_client.py    # Ollama LLM client setup
+├── chat.py               # Interactive chat loop
+├── main.py               # Standalone weather assistant
 ├── tools/
-│   ├── weather.py      # Weather tool
-│   └── calculator.py   # Calculator tool
-├── agents/             # Agent definitions
-├── prompts/            # Prompt templates
-├── memory/             # Conversation memory
-├── tests/              # Tests
+│   ├── weather.py        # Live weather via wttr.in
+│   ├── calculator.py     # Safe math evaluator
+│   ├── file_reader.py    # File summarizer
+│   └── web_search.py     # Google News RSS + Wikipedia
 └── requirements-ai.txt
 ```
 
+---
+
 ## Configuration
 
-Edit `chat.py` to change the model or Ollama URL:
-
 ```python
-llm = ChatOllama(
-    model="llama3.1:8b",
-    base_url="http://host.docker.internal:11434",
-    temperature=0,
-)
+# chat.py
+OLLAMA_MODEL    = "qwen2.5:14b"
+OLLAMA_BASE_URL = "http://host.docker.internal:11434"
 ```
+
+---
 
 ## Tools
 
-| Tool        | Description                        |
-|-------------|------------------------------------|
-| `get_weather` | Returns current weather for a city |
-| `calculator`  | Evaluates math expressions         |
+| Tool | Source | API Key |
+|------|--------|---------|
+| Weather | wttr.in | None |
+| Calculator | built-in | None |
+| News search | Google News RSS | None |
+| Wiki search | Wikipedia API | None |
+| File reader | local filesystem | None |
+
+Zero external dependencies. Zero cost.

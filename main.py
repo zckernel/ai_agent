@@ -1,34 +1,32 @@
 import ollama
 
-from app.AIAgent.tools.weather import get_weather
+from tools.weather import get_weather
 
 
-client = ollama.Client(
-    host='http://host.docker.internal:11434'
-)
+OLLAMA_BASE_URL = "http://host.docker.internal:11434"
+OLLAMA_MODEL = "llama3.1:8b"
 
-city = input("Location: ")
+client = ollama.Client(host=OLLAMA_BASE_URL)
 
-weather_data = get_weather(city)
 
-prompt = f"""
-You are a weather assistant.
+def ask_weather(city: str) -> str:
+    weather_data = get_weather(city)
 
-Weather data:
-{weather_data}
-
-Answer user naturally and shortly.
-"""
-
-response = client.chat(
-    model="qwen2.5:7b",
-    messages=[
-        {
+    response = client.chat(
+        model=OLLAMA_MODEL,
+        messages=[{
             "role": "user",
-            "content": prompt,
-        }
-    ]
-)
+            "content": (
+                f"You are a weather assistant.\n\n"
+                f"Weather data:\n{weather_data}\n\n"
+                f"Answer naturally and briefly."
+            ),
+        }],
+    )
+    return response.message.content
 
-print("\nAI Response:\n")
-print(response["message"]["content"])
+
+if __name__ == "__main__":
+    city = input("Location: ")
+    print("\nAI Response:\n")
+    print(ask_weather(city))
