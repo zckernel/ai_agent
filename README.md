@@ -20,7 +20,7 @@ MicroAI Chat is a lightweight conversational AI agent powered by [Ollama](https:
 
 | Skill | Example |
 |-------|---------|
-| Live weather | *"Яка погода у Львові?"* |
+| Live weather + forecast | *"Яка погода у Львові завтра?"* |
 | Math | *"What is 15% of 4800?"* |
 | Wikipedia lookup | *"Tell me about Nikola Tesla"* |
 | Latest news | *"Give me today's top news"* |

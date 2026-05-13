@@ -1,6 +1,5 @@
 import asyncio
 import os
-import time
 
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 
@@ -86,11 +85,10 @@ agent = create_react_agent(
 agent_executor = AgentExecutor(
     agent=agent,
     tools=tools,
-    verbose=True,
+    verbose=False,
     handle_parsing_errors=True,
     max_iterations=2,
     max_execution_time=15,
-    return_intermediate_steps=True,
 )
 
 
@@ -112,9 +110,7 @@ def summarize_file(path: str, user_message: str) -> str:
     if not os.path.isabs(path):
         path = os.path.join(WORK_DIR, path)
 
-    t0 = time.time()
     content = read_file_content.invoke(path)
-    print(f"[perf] file read: {time.time() - t0:.2f}s")
 
     prompt = (
         f"Describe this file in 1-2 sentences: what type of file it is and what it contains. "
@@ -125,22 +121,21 @@ def summarize_file(path: str, user_message: str) -> str:
     )
 
     print("\nAI: ", end="", flush=True)
-    t1 = time.time()
     chunks = []
     for chunk in llm.stream([HumanMessage(content=prompt)]):
         print(chunk.content, end="", flush=True)
         chunks.append(chunk.content)
-    print(f"\n[perf] llm summarize: {time.time() - t1:.2f}s")
+    print()
 
     return "".join(chunks)
 
 
 async def _ask_agent_async(user_input: str, chat_history: str) -> str:
-    t0 = time.time()
     output = ""
     buffer = ""
     streaming = False
     printed_prefix = False
+    used_tools: list[str] = []
 
     try:
         async for event in agent_executor.astream_events(
@@ -149,7 +144,12 @@ async def _ask_agent_async(user_input: str, chat_history: str) -> str:
         ):
             kind = event["event"]
 
-            if kind == "on_chat_model_start":
+            if kind == "on_tool_start":
+                tool_name = event.get("name", "tool")
+                used_tools.append(tool_name)
+                print(f"[using: {tool_name}]")
+
+            elif kind == "on_chat_model_start":
                 buffer = ""
                 streaming = False
 
@@ -165,13 +165,15 @@ async def _ask_agent_async(user_input: str, chat_history: str) -> str:
                         after = buffer.split("Final Answer:", 1)[1].lstrip()
                         if after:
                             if not printed_prefix:
-                                print("\nAI: ", end="", flush=True)
+                                if not used_tools:
+                                    print("[direct]")
+                                print("AI: ", end="", flush=True)
                                 printed_prefix = True
                             print(after, end="", flush=True)
                             output = after
                 else:
                     if not printed_prefix:
-                        print("\nAI: ", end="", flush=True)
+                        print("AI: ", end="", flush=True)
                         printed_prefix = True
                     print(token, end="", flush=True)
                     output += token
@@ -180,24 +182,19 @@ async def _ask_agent_async(user_input: str, chat_history: str) -> str:
                 chain_out = event["data"].get("output", {})
                 final = chain_out.get("output", "") if isinstance(chain_out, dict) else str(chain_out)
                 if not output:
-                    print(f"\nAI: {final}", end="", flush=True)
+                    print(f"AI: {final}", end="", flush=True)
                     output = final
 
     except Exception as e:
         print(f"\n[error] {e}")
         output = "Не вдалося отримати відповідь. Спробуйте переформулювати запит."
 
-    print(f"\n[perf] agent total: {time.time() - t0:.2f}s")
     return output.strip()
-
-
-def ask_agent(user_input: str, chat_history: str) -> str:
-    return asyncio.run(_ask_agent_async(user_input, chat_history))
 
 
 # ── Chat loop ─────────────────────────────────────────────────────────────────
 
-def main():
+async def main():
     print("AI Agent")
     print("Type /exit to quit\n")
 
@@ -214,11 +211,11 @@ def main():
             path = extract_file_path(user_input)
             ai_output = summarize_file(path, user_message=user_input)
         else:
-            ai_output = ask_agent(user_input, chat_history)
+            ai_output = await _ask_agent_async(user_input, chat_history)
             print()
 
         chat_history += f"Human: {user_input}\nAI: {ai_output}\n"
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
