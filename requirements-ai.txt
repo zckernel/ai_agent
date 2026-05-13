@@ -1,0 +1,5 @@
+requests
+langchain==0.3.25
+langchain-ollama==0.3.3
+langchain-community==0.3.24
+langchainhub==0.1.21
