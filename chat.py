@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 
@@ -134,22 +135,64 @@ def summarize_file(path: str, user_message: str) -> str:
     return "".join(chunks)
 
 
-def ask_agent(user_input: str, chat_history: str) -> str:
+async def _ask_agent_async(user_input: str, chat_history: str) -> str:
     t0 = time.time()
+    output = ""
+    buffer = ""
+    streaming = False
+    printed_prefix = False
+
     try:
-        response = agent_executor.invoke({
-            "input": user_input,
-            "chat_history": chat_history,
-        })
-        output = response["output"]
-        if "Agent stopped" in output and response.get("intermediate_steps"):
-            last_obs = response["intermediate_steps"][-1][1]
-            output = str(last_obs)
+        async for event in agent_executor.astream_events(
+            {"input": user_input, "chat_history": chat_history},
+            version="v2",
+        ):
+            kind = event["event"]
+
+            if kind == "on_chat_model_start":
+                buffer = ""
+                streaming = False
+
+            elif kind == "on_chat_model_stream":
+                token = event["data"]["chunk"].content
+                if not token:
+                    continue
+                buffer += token
+
+                if not streaming:
+                    if "Final Answer:" in buffer:
+                        streaming = True
+                        after = buffer.split("Final Answer:", 1)[1].lstrip()
+                        if after:
+                            if not printed_prefix:
+                                print("\nAI: ", end="", flush=True)
+                                printed_prefix = True
+                            print(after, end="", flush=True)
+                            output = after
+                else:
+                    if not printed_prefix:
+                        print("\nAI: ", end="", flush=True)
+                        printed_prefix = True
+                    print(token, end="", flush=True)
+                    output += token
+
+            elif kind == "on_chain_end" and event["name"] == "AgentExecutor":
+                chain_out = event["data"].get("output", {})
+                final = chain_out.get("output", "") if isinstance(chain_out, dict) else str(chain_out)
+                if not output:
+                    print(f"\nAI: {final}", end="", flush=True)
+                    output = final
+
     except Exception as e:
-        print(f"[error] {e}")
+        print(f"\n[error] {e}")
         output = "Не вдалося отримати відповідь. Спробуйте переформулювати запит."
-    print(f"[perf] agent total: {time.time() - t0:.2f}s")
-    return output
+
+    print(f"\n[perf] agent total: {time.time() - t0:.2f}s")
+    return output.strip()
+
+
+def ask_agent(user_input: str, chat_history: str) -> str:
+    return asyncio.run(_ask_agent_async(user_input, chat_history))
 
 
 # ── Chat loop ─────────────────────────────────────────────────────────────────
@@ -172,7 +215,7 @@ def main():
             ai_output = summarize_file(path, user_message=user_input)
         else:
             ai_output = ask_agent(user_input, chat_history)
-            print(f"\nAI: {ai_output}\n")
+            print()
 
         chat_history += f"Human: {user_input}\nAI: {ai_output}\n"
 
